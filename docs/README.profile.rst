@@ -93,6 +93,14 @@ Packages have to be listed one per line. Lines starting with a ``#`` and blank l
 
 This file is required when generating ISO images using the ``iso`` or ``netboot`` build modes.
 
+packages_aur.arch
+=================
+
+All packages from AUR to be installed into the environment of an ISO image have to be listed in an architecture specific file
+(e.g. ``packages_aur.x86_64``), which resides top-level in the profile.
+
+Packages have to be listed one per line. Lines starting with a ``#`` and blank lines are ignored.
+
 pacman.conf
 ===========
 

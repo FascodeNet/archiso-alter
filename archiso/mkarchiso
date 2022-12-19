@@ -49,6 +49,11 @@ efiboot_files=()
 # adapted from GRUB_EARLY_INITRD_LINUX_STOCK in https://git.savannah.gnu.org/cgit/grub.git/tree/util/grub-mkconfig.in
 readonly ucodes=('intel-uc.img' 'intel-ucode.img' 'amd-uc.img' 'amd-ucode.img' 'early_ucode.cpio' 'microcode.cpio')
 
+aur_helper_args=()
+aur_helper_command="yay"
+aur_helper_package="yay"
+aur_helper_depends=("go")
+
 
 # Show an INFO message
 # $1: message string
@@ -355,6 +360,54 @@ _make_packages() {
     else
         env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" "${buildmode_pkg_list[@]}"
     fi
+
+    if [[ -v cert_list[0] ]]; then
+        exec {ARCHISO_TLS_FD}<&-
+        unset ARCHISO_TLS_FD
+    fi
+    if [[ -v cert_list[2] ]]; then
+        exec {ARCHISO_TLSCA_FD}<&-
+        unset ARCHISO_TLSCA_FD
+    fi
+    if [[ -v gpg_publickey ]]; then
+        exec {ARCHISO_GNUPG_FD}<&-
+        unset ARCHISO_GNUPG_FD
+    fi
+
+    _msg_info "Done! Packages installed successfully."
+}
+
+# Install desired packages from AUR to the root file system
+_make_packages_aur(){
+    _msg_info "Installing packages to '${pacstrap_dir}/'..."
+
+    if [[ -v gpg_publickey ]]; then
+        exec {ARCHISO_GNUPG_FD}<"$gpg_publickey"
+        export ARCHISO_GNUPG_FD
+    fi
+    if [[ -v cert_list[0] ]]; then
+        exec {ARCHISO_TLS_FD}<"${cert_list[0]}"
+        export ARCHISO_TLS_FD
+    fi
+    if [[ -v cert_list[2] ]]; then
+        exec {ARCHISO_TLSCA_FD}<"${cert_list[2]}"
+        export ARCHISO_TLSCA_FD
+    fi
+
+    # prepare for yay
+    cp -rf --preserve=mode "${profile}/alteriso/aur.sh" "${pacstrap_dir}/root/aur.sh"
+
+    # Unset TMPDIR to work around https://bugs.archlinux.org/task/70580
+    if [[ "${quiet}" = "y" ]]; then
+        env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" --asdeps --needed "${aur_helper_depends[@]}" &> /dev/null
+    else
+        env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" --asdeps --needed "${aur_helper_depends[@]}"
+    fi
+
+    eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/aur.sh" -a "${aur_helper_command}" -e "${aur_helper_package}" -d "$(printf "%s\n" "${aur_helper_depends[@]}" | tr "\n" ",")" "-p" "$(printf "%s\n" "${buildmode_aurpkg_list[@]}" | tr "\n" ",")" -- "${aur_helper_args[@]}"
+
+    # Remove aur script
+    rm -- "${pacstrap_dir}/root/aur.sh"
 
     if [[ -v cert_list[0] ]]; then
         exec {ARCHISO_TLS_FD}<&-
@@ -1122,6 +1175,20 @@ _validate_requirements_airootfs_image_type_erofs() {
     fi
 }
 
+_validate_common_requirements_alteriso(){
+    if ! [[ -e "$profile/alteriso/aur.sh" ]]; then
+        #(( validation_error=validation_error+1 ))
+        _msg_warning "Validating build mode '${_buildmode}': $profile/alteriso/aur.sh is not available. Make profile using the latest Alteriso!" 0
+        _msg_warning "                                       Installing packages from AUR will not work!" 0
+
+        _make_packages_aur(){
+            # shellcheck disable=SC2317
+            return 0
+        }
+    fi
+
+}
+
 _validate_common_requirements_buildmode_all() {
     if ! command -v pacman &> /dev/null; then
         (( validation_error=validation_error+1 ))
@@ -1135,6 +1202,8 @@ _validate_common_requirements_buildmode_all() {
         (( validation_error=validation_error+1 ))
         _msg_error "Validating build mode '${_buildmode}': gzip is not available on this host. Install 'gzip'!" 0
     fi
+
+    _validate_common_requirements_alteriso
 }
 
 _validate_requirements_buildmode_bootstrap() {
