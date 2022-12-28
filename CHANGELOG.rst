@@ -7,6 +7,19 @@ Changelog
 
 Added
 -----
+
+Changed
+-------
+
+Removed
+-------
+
+[69] - 2022-12-24
+=================
+
+Added
+-----
+
 - Add Memtest86+ to x86_64 UEFI GRUB boot menu.
 
 Changed
@@ -16,9 +29,11 @@ Changed
 - Open the file descriptors for code signing certificates and GPG public key as read only. Nothing from the within the
   ``pacstrap`` invoked chroot should ever be allowed to write outside of it.
 - Error out early if any of the code signing certificate files passed with option ``-c`` do not exist.
-
-Removed
--------
+- Use LZMA compressed EROFS image for the baseline profile. Now that xz 5.4 is out and erofs-utils is built with LZMA
+  support, using a higher compression is possible.
+- Add ``/etc/machine-id`` with special value ``uninitialized``. The final id is generated at boot time, and systemd's
+  first-boot mechanim (see ``First Boot Semantics`` in ``machine-id(5)``) applies. No functional change unless that
+  ``ConditionFirstBoot=yes`` is true and passive unit ``first-boot-complete.target`` activates for ordering.
 
 [68] - 2022-10-30
 =================
