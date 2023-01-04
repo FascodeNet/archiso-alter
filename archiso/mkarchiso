@@ -22,6 +22,8 @@ app_name="${0##*/}"
 # Define global variables. All of them will be overwritten later
 pkg_list=()
 bootstrap_pkg_list=()
+aur_pkg_list=()
+bootstrap_aur_pkg_list=()
 quiet=""
 work_dir=""
 out_dir=""
@@ -37,6 +39,8 @@ arch=""
 pacman_conf=""
 packages=""
 bootstrap_packages=""
+aur_packages=""
+bootstrap_aur_packages=""
 pacstrap_dir=""
 buildmodes=()
 bootmodes=()
@@ -148,6 +152,7 @@ _show_config() {
     _msg_info "               Boot modes:   ${bootmodes[*]:-None}"
     _msg_info "            Packages File:   ${buildmode_packages}"
     _msg_info "                 Packages:   ${buildmode_pkg_list[*]}"
+    _msg_info "            AUR packages:   ${buildmode_aur_pkg_list[*]:-None}"
 }
 
 # Cleanup airootfs
@@ -396,6 +401,7 @@ _make_packages_aur(){
     fi
 
     # prepare for yay
+    cp -rf --preserve=mode "${work_dir}/${buildmode}.pacman.conf" "${pacstrap_dir}/etc/alteriso-pacman.conf"
     cp -rf --preserve=mode "${profile}/alteriso/aur.sh" "${pacstrap_dir}/root/aur.sh"
 
     # Unset TMPDIR to work around https://bugs.archlinux.org/task/70580
@@ -405,7 +411,7 @@ _make_packages_aur(){
         env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" --asdeps --needed "${aur_helper_depends[@]}"
     fi
 
-    eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/aur.sh" -a "${aur_helper_command}" -e "${aur_helper_package}" -d "$(printf "%s\n" "${aur_helper_depends[@]}" | tr "\n" ",")" "-p" "$(printf "%s\n" "${buildmode_aurpkg_list[@]}" | tr "\n" ",")" -- "${aur_helper_args[@]}"
+    eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/aur.sh" -a "${aur_helper_command}" -e "${aur_helper_package}" -d "$(printf "%s\n" "${aur_helper_depends[@]}" | tr "\n" ",")" "-p" "$(printf "%s\n" "${buildmode_aur_pkg_list[@]}" | tr "\n" ",")" -- "${aur_helper_args[@]}"
 
     # Remove aur script
     rm -- "${pacstrap_dir}/root/aur.sh"
@@ -1231,9 +1237,32 @@ _validate_requirements_buildmode_bootstrap() {
     fi
 }
 
+_validate_requirements_buildmode_bootstrap_aur(){
+    local bootstrap_pkg_list_from_file=()
+
+    # Check if packages for the bootstrap image are specified
+    if [[ -e "${bootstrap_aur_packages}" ]]; then
+        mapfile -t bootstrap_pkg_list_from_file < \
+            <(sed '/^[[:blank:]]*#.*/d;s/#.*//;/^[[:blank:]]*$/d' "${bootstrap_aur_packages}")
+        bootstrap_aur_pkg_list+=("${bootstrap_pkg_list_from_file[@]}")
+    fi
+}
+
+_validate_common_requirements_buildmode_iso_netboot_aur(){
+    local pkg_list_from_file=()
+
+    # Check if the aur package list file exists and read packages from it
+    if [[ -e "${aur_packages}" ]]; then
+        mapfile -t pkg_list_from_file < <(sed '/^[[:blank:]]*#.*/d;s/#.*//;/^[[:blank:]]*$/d' "${aur_packages}")
+        aur_pkg_list+=("${pkg_list_from_file[@]}")
+    fi
+}
+
 _validate_common_requirements_buildmode_iso_netboot() {
     local bootmode
     local pkg_list_from_file=()
+
+    _validate_common_requirements_buildmode_iso_netboot_aur
 
     # Check if the package list file exists and read packages from it
     if [[ -e "${packages}" ]]; then
@@ -1578,12 +1607,18 @@ _read_profile() {
         [[ -n "$packages" ]] || packages="${profile}/packages.${arch}"
         packages="$(realpath -- "${packages}")"
         pacman_conf="$(realpath -- "${pacman_conf}")"
+        aur_packages=$(realpath -- "${aur_packages}")
 
         # Resolve paths of files that may reside in the profile's directory
         if [[ -z "$bootstrap_packages" ]] && [[ -e "${profile}/bootstrap_packages.${arch}" ]]; then
             bootstrap_packages="${profile}/bootstrap_packages.${arch}"
             bootstrap_packages="$(realpath -- "${bootstrap_packages}")"
             pacman_conf="$(realpath -- "${pacman_conf}")"
+        fi
+
+        if [[ -z "$bootstrap_aur_packages" ]] && [[ -e "${profile}/bootstrap_aur_packages.${arch}" ]]; then
+            bootstrap_aur_packages="${profile}/aur_packages.${arch}"
+            bootstrap_aur_packages="$(realpath -- "${bootstrap_aur_packages}")"
         fi
 
         cd -- "${OLDPWD}"
@@ -1755,6 +1790,7 @@ _build_iso_base() {
     local buildmode_packages="${packages}"
     # Set the package list to use
     local buildmode_pkg_list=("${pkg_list[@]}")
+    local buildmode_aur_pkg_list=("${aur_pkg_list[@]}")
     # Set up essential directory paths
     pacstrap_dir="${work_dir}/${arch}/airootfs"
     isofs_dir="${work_dir}/iso"
@@ -1793,6 +1829,7 @@ _build_buildmode_bootstrap() {
     local buildmode_packages="${bootstrap_packages}"
     # Set the package list to use
     local buildmode_pkg_list=("${bootstrap_pkg_list[@]}")
+    local buildmode_aur_pkg_list=("${bootstrap_aur_pkg_list[@]}")
 
     # Set up essential directory paths
     pacstrap_dir="${work_dir}/${arch}/bootstrap/root.${arch}"
