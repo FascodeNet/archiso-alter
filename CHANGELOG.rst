@@ -11,8 +11,48 @@ Added
 Changed
 -------
 
+Deprecated
+----------
+
+Fixed
+-----
+
 Removed
 -------
+
+[70] - 2023-02-27
+=================
+
+Added
+-----
+
+- Support *file system transposition* to simplify boot medium preparation for UEFI boot via extracting the ISO image
+  contents to a drive. ``grub.cfg`` does not hardcode the ISO volume label anymore, instead GRUB will search for volume
+  with a ``/boot/grub/YYYY-mm-dd-HH-MM-SS-00.uuid`` file on it.
+- Preload GRUB's NTFS modules for UEFI that allegedly have native NTFS support. GRUB's exFAT and UDF modules are also
+  preloaded in case someone finds them useful.
+
+Changed
+-------
+
+- Identify the ISO volume via a UUID instead of a file system label to avoid collisions of multiple ISOs created in the
+  same month.
+- Honor ``SOURCE_DATE_EPOCH`` in the ``date`` command used by ``profiledef.sh`` of the shipped profiles.
+- Do not duplicate ``grub.cfg`` in both ISO 9660 and the EFI system partition / El Torito image. GRUB will search for
+  the ISO volume and load the ``grub.cfg`` from there.
+- Moved GRUB files on ISO 9660 from ``/EFI/BOOT/`` to a boot-platform neutral place ``/boot/grub/``. This does not apply
+  to the EFI binaries that remain in the default/fallback boot path.
+- Move ``grubenv`` to ``/boot/grub/grubenv`` on ISO 9660 so that it is together with the rest of GRUB-specific files.
+  Additionally write more variables in it. The previous ``/${install_dir}/grubenv`` (``/arch/grubenv`` for releng)
+  is deprecated and a future archiso release will not create this file anymore.
+- Moved syslinux directory from ``/syslinux/`` to ``/boot/syslinux/`` to keep most boot loader files in ``/boot/``.
+- Update ``README.transfer`` documentation and convert it to reStructuredText.
+- Use ``console`` as grub's ``terminal_output``, as ``gfxterm`` leads to a blank screen on some hardware.
+
+Removed
+-------
+
+- Do not place memtest86+ in netboot artifacts.
 
 [69] - 2022-12-24
 =================
@@ -241,7 +281,7 @@ Removed
 -------
 
 - Remove all files related to ``mkinitcpio`` integration, as they now live in
-  https://gitlab.archlinux.org/mkinitcpio/mkinitcpio-archiso
+  https://gitlab.archlinux.org/archlinux/mkinitcpio/mkinitcpio-archiso
 
 [57] - 2021-07-30
 =================
