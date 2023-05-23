@@ -411,7 +411,7 @@ _make_packages_aur(){
         env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" --asdeps --needed "${aur_helper_depends[@]}"
     fi
 
-    eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/aur.sh" -a "${aur_helper_command}" -e "${aur_helper_package}" -d "$(printf "%s\n" "${aur_helper_depends[@]}" | tr "\n" ",")" "-p" "$(printf "%s\n" "${buildmode_aur_pkg_list[@]}" | tr "\n" ",")" -- "${aur_helper_args[@]}"
+    env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/aur.sh" -a "${aur_helper_command}" -e "${aur_helper_package}" -d "$(printf "%s\n" "${aur_helper_depends[@]}" | tr "\n" ",")" "-p" "$(printf "%s\n" "${buildmode_aur_pkg_list[@]}" | tr "\n" ",")" -- "${aur_helper_args[@]}"
 
     # Remove aur script
     rm -- "${pacstrap_dir}/root/aur.sh"
